@@ -16,16 +16,27 @@ const loadBatch = (req, res, next) => {
     .catch((error) => next(error))
 }
 
+// const getStudents = (req, res, next) => {
+//   Promise.all([req.game.playerOneId, req.game.playerTwoId].map(playerId => User.findById(playerId)))
+//     .then((users) => {
+//       // Combine player data and user's name
+//       req.players = users
+//         .filter(u => !!u)
+//         .map(u => ({
+//           userId: u._id,
+//           name: u.name
+//         }))
+//       next()
+//     })
+//     .catch((error) => next(error))
+// }
+
 const getStudents = (req, res, next) => {
-  Promise.all([req.game.playerOneId, req.game.playerTwoId].map(playerId => User.findById(playerId)))
-    .then((users) => {
-      // Combine player data and user's name
-      req.players = users
-        .filter(u => !!u)
-        .map(u => ({
-          userId: u._id,
-          name: u.name
-        }))
+  const id = req.params.id
+
+  Student.find({"batchId": id})
+    .then((students) => {
+      req.students = students
       next()
     })
     .catch((error) => next(error))
@@ -33,98 +44,118 @@ const getStudents = (req, res, next) => {
 
 module.exports = io => {
   router
-    .get('/games/:id/students', loadBatch, getStudents, (req, res, next) => {
+    .get('/batches/:id/students', loadBatch, getStudents, (req, res, next) => {
+      console.log(req.batch);
       if (!req.batch || !req.students) { return next() }
-      // res.json(req.players)
-      console.log(req)
+      res.json(req.students)
     })
 
-    .post('/games/:id/students', authenticate, loadBatch, (req, res, next) => {
-      if (!req.game) { return next() }
 
-      const userId = req.account._id
-      const { playerOneId, playerTwoId } = req.game
-
-      const isPlayerOne = playerOneId && playerOneId.toString() === userId.toString()
-      const isPlayerTwo = playerTwoId && playerTwoId.toString() === userId.toString()
-
-      if (isPlayerOne || isPlayerTwo) {
-        const error = Error.new('You already joined this game!')
-        error.status = 401
-        return next(error)
+    .post('/batches/:id/students', authenticate, loadBatch, (req, res, next) => {
+      const newStudent = {
+        batchId: req.batch._id,
+        name: req.body.name,
+        profileImage: req.body.profileImage
       }
 
-      if (!!playerOneId && !!playerTwoId) {
-        const error = Error.new('Sorry game is full!')
-        error.status = 401
-        return next(error)
-      }
-
-      // Add the user to the players
-      if (!playerOneId) req.game.playerOneId = userId
-      if (!playerTwoId) req.game.playerTwoId = userId
-
-      req.game.save()
-        .then((game) => {
-          req.game = game
-          next()
+      Student.create(newStudent)
+        .then((student) => {
+          io.emit('action', {
+            type: 'STUDENT_CREATED',
+            payload: student
+          })
+          res.json(student)
         })
         .catch((error) => next(error))
-    },
-    // Fetch new player data
-    getPlayers,
-    // Respond with new player data in JSON and over socket
-    (req, res, next) => {
-      io.emit('action', {
-        type: 'GAME_PLAYERS_UPDATED',
-        payload: {
-          game: req.game,
-          players: req.players
-        }
       })
-      res.json(req.players)
-    })
 
-    .delete('/games/:id/players', authenticate, (req, res, next) => {
-      if (!req.game) { return next() }
+    //
+    // .post('/games/:id/students', authenticate, loadBatch, (req, res, next) => {
+    //   if (!req.batch) { return next() }
+    //
+    //   const userId = req.account._id
+    //   const { playerOneId, playerTwoId } = req.game
+    //
+    //   const isPlayerOne = playerOneId && playerOneId.toString() === userId.toString()
+    //   const isPlayerTwo = playerTwoId && playerTwoId.toString() === userId.toString()
+    //
+    //   if (isPlayerOne || isPlayerTwo) {
+    //     const error = Error.new('You already joined this game!')
+    //     error.status = 401
+    //     return next(error)
+    //   }
+    //
+    //   if (!!playerOneId && !!playerTwoId) {
+    //     const error = Error.new('Sorry game is full!')
+    //     error.status = 401
+    //     return next(error)
+    //   }
+    //
+    //   // Add the user to the players
+    //   if (!playerOneId) req.game.playerOneId = userId
+    //   if (!playerTwoId) req.game.playerTwoId = userId
+    //
+    //   req.game.save()
+    //     .then((game) => {
+    //       req.game = game
+    //       next()
+    //     })
+    //     .catch((error) => next(error))
+    // },
+    // // Fetch new player data
+    // getPlayers,
+    // // Respond with new player data in JSON and over socket
+    // (req, res, next) => {
+    //   io.emit('action', {
+    //     type: 'GAME_PLAYERS_UPDATED',
+    //     payload: {
+    //       game: req.game,
+    //       players: req.players
+    //     }
+    //   })
+    //   res.json(req.players)
+    // })
 
-      const userId = req.account._id
-      const { playerOneId, playerTwoId } = req.game
-
-      const isPlayerOne = playerOneId.toString() === userId.toString()
-      const isPlayerTwo = playerTwoId.toString() === userId.toString()
-
-      if (!isPlayerOne || !isPlayerTwo) {
-        const error = Error.new('You are not a player in this game!')
-        error.status = 401
-        return next(error)
-      }
-
-      // Add the user to the players
-      if (isPlayerOne) req.game.playerOneId = null
-      if (isPlayerTwo) req.game.playerTwoId = null
-
-      req.game.save()
-        .then((game) => {
-          req.game = game
-          next()
-        })
-        .catch((error) => next(error))
-
-    },
-    // Fetch new player data
-    getPlayers,
-    // Respond with new player data in JSON and over socket
-    (req, res, next) => {
-      io.emit('action', {
-        type: 'GAME_PLAYERS_UPDATED',
-        payload: {
-          game: req.game,
-          players: req.players
-        }
-      })
-      res.json(req.players)
-    })
+    // .delete('/games/:id/players', authenticate, (req, res, next) => {
+    //   if (!req.game) { return next() }
+    //
+    //   const userId = req.account._id
+    //   const { playerOneId, playerTwoId } = req.game
+    //
+    //   const isPlayerOne = playerOneId.toString() === userId.toString()
+    //   const isPlayerTwo = playerTwoId.toString() === userId.toString()
+    //
+    //   if (!isPlayerOne || !isPlayerTwo) {
+    //     const error = Error.new('You are not a player in this game!')
+    //     error.status = 401
+    //     return next(error)
+    //   }
+    //
+    //   // Add the user to the players
+    //   if (isPlayerOne) req.game.playerOneId = null
+    //   if (isPlayerTwo) req.game.playerTwoId = null
+    //
+    //   req.game.save()
+    //     .then((game) => {
+    //       req.game = game
+    //       next()
+    //     })
+    //     .catch((error) => next(error))
+    //
+    // },
+    // // Fetch new player data
+    // getPlayers,
+    // // Respond with new player data in JSON and over socket
+    // (req, res, next) => {
+    //   io.emit('action', {
+    //     type: 'GAME_PLAYERS_UPDATED',
+    //     payload: {
+    //       game: req.game,
+    //       players: req.players
+    //     }
+    //   })
+    //   res.json(req.players)
+    // })
 
   return router
 }
