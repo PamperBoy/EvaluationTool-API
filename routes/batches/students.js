@@ -1,22 +1,22 @@
 // routes/games.js
 const router = require('express').Router()
 const passport = require('../../config/auth')
-const { Game, User } = require('../../models')
+const { Batch, User, Student } = require('../../models')
 
 const authenticate = passport.authorize('jwt', { session: false })
 
-const loadGame = (req, res, next) => {
+const loadBatch = (req, res, next) => {
   const id = req.params.id
 
-  Game.findById(id)
-    .then((game) => {
-      req.game = game
+  Batch.findById(id)
+    .then((batch) => {
+      req.batch = batch
       next()
     })
     .catch((error) => next(error))
 }
 
-const getPlayers = (req, res, next) => {
+const getStudents = (req, res, next) => {
   Promise.all([req.game.playerOneId, req.game.playerTwoId].map(playerId => User.findById(playerId)))
     .then((users) => {
       // Combine player data and user's name
@@ -33,12 +33,13 @@ const getPlayers = (req, res, next) => {
 
 module.exports = io => {
   router
-    .get('/games/:id/players', loadGame, getPlayers, (req, res, next) => {
-      if (!req.game || !req.players) { return next() }
-      res.json(req.players)
+    .get('/games/:id/students', loadBatch, getStudents, (req, res, next) => {
+      if (!req.batch || !req.students) { return next() }
+      // res.json(req.players)
+      console.log(req)
     })
 
-    .post('/games/:id/players', authenticate, loadGame, (req, res, next) => {
+    .post('/games/:id/students', authenticate, loadBatch, (req, res, next) => {
       if (!req.game) { return next() }
 
       const userId = req.account._id

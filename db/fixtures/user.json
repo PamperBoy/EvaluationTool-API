@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Marc Smalbrugge",
+    "email": "marc_smalbrugge@live.nl",
+    "password": "abc123"
+  },
+  {
+    "name": "Klaas Vaak",
+    "email": "klaas@test.nl",
+    "password": "abc123"
+  },
+  {
+    "name": "Piet Niet",
+    "email": "piet@test.nl",
+    "password": "abc123"
+  }
+]

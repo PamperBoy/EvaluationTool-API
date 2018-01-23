@@ -2,7 +2,7 @@ const mongoose = require('../config/database')
 const { Schema } = mongoose
 
 const batchSchema = new Schema({
-  classNumber:        { type: Number },
+  batchNumber:        { type: Number },
   startDate:          { type: Date },
   endDate:            { type: Date },
   createdAt:          { type: Date, default: Date.now },
