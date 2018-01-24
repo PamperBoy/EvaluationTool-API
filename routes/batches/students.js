@@ -1,7 +1,7 @@
 // routes/games.js
 const router = require('express').Router()
 const passport = require('../../config/auth')
-const { Batch, User, Student } = require('../../models')
+const { Batch, User, Student, Evaluation} = require('../../models')
 
 const authenticate = passport.authorize('jwt', { session: false })
 
@@ -16,40 +16,81 @@ const loadBatch = (req, res, next) => {
     .catch((error) => next(error))
 }
 
-// const getStudents = (req, res, next) => {
-//   Promise.all([req.game.playerOneId, req.game.playerTwoId].map(playerId => User.findById(playerId)))
-//     .then((users) => {
-//       // Combine player data and user's name
-//       req.players = users
-//         .filter(u => !!u)
-//         .map(u => ({
-//           userId: u._id,
-//           name: u.name
-//         }))
-//       next()
-//     })
-//     .catch((error) => next(error))
-// }
-
 const getStudents = (req, res, next) => {
-  const id = req.params.id
+    const id = req.params.id
 
-  Student.find({"batchId": id})
-    .then((students) => {
-      req.students = students
-      next()
-    })
-    .catch((error) => next(error))
+    Student.find({"batchId": id})
+      .sort({ name: 1 })
+      .then((students) => {
+
+        let evaluationPromises = []
+
+        students.map(student => {
+          evaluationPromises.push(Evaluation.find({"studentId": student._id})
+          .sort({ evaluationDate: -1 }))
+        })
+
+        return Promise.all(evaluationPromises)
+          .then(arrayOfEvaluations => {
+
+            let sortedByStudentId = {}
+
+            arrayOfEvaluations.forEach(evaluations => {
+
+              evaluations.forEach(evaluation => {
+                if(!sortedByStudentId[evaluation.studentId]) {
+                  sortedByStudentId[evaluation.studentId] = []
+                }
+                sortedByStudentId[evaluation.studentId].push(evaluation)
+              })
+            })
+
+            let newStudents = []
+
+            students.map(student => {
+              let newStudent = {
+                batchId: student.batchId,
+                name: student.name,
+                profileImage: student.profileImage,
+                _id: student._id,
+                createdAt: student.createdAt,
+                updatedAt: student.updatedAt,
+                evaluations: []
+              }
+
+              if(sortedByStudentId[student._id]) {
+                newStudent.evaluations = sortedByStudentId[student.id]
+              }
+              newStudents.push(newStudent)
+            })
+            return newStudents
+          })
+        })
+
+        .then(students => {
+          req.students = students
+          next()
+        })
+        .catch((error) => next(error))
 }
 
 module.exports = io => {
   router
     .get('/batches/:id/students', loadBatch, getStudents, (req, res, next) => {
-      console.log(req.batch);
       if (!req.batch || !req.students) { return next() }
       res.json(req.students)
     })
 
+    .get('/batches/:id/students/:id', loadBatch, getStudents, (req, res, next) => {
+      const id = req.params.id
+
+      Student.findById(id)
+        .then((student) => {
+          if (!student) { return next() }
+          res.json(student)
+        })
+        .catch((error) => next(error))
+    })
 
     .post('/batches/:id/students', authenticate, loadBatch, (req, res, next) => {
       const newStudent = {
@@ -64,98 +105,75 @@ module.exports = io => {
             type: 'STUDENT_CREATED',
             payload: student
           })
+          res.status = 201
+
           res.json(student)
         })
         .catch((error) => next(error))
       })
 
-    //
-    // .post('/games/:id/students', authenticate, loadBatch, (req, res, next) => {
-    //   if (!req.batch) { return next() }
-    //
-    //   const userId = req.account._id
-    //   const { playerOneId, playerTwoId } = req.game
-    //
-    //   const isPlayerOne = playerOneId && playerOneId.toString() === userId.toString()
-    //   const isPlayerTwo = playerTwoId && playerTwoId.toString() === userId.toString()
-    //
-    //   if (isPlayerOne || isPlayerTwo) {
-    //     const error = Error.new('You already joined this game!')
-    //     error.status = 401
-    //     return next(error)
-    //   }
-    //
-    //   if (!!playerOneId && !!playerTwoId) {
-    //     const error = Error.new('Sorry game is full!')
-    //     error.status = 401
-    //     return next(error)
-    //   }
-    //
-    //   // Add the user to the players
-    //   if (!playerOneId) req.game.playerOneId = userId
-    //   if (!playerTwoId) req.game.playerTwoId = userId
-    //
-    //   req.game.save()
-    //     .then((game) => {
-    //       req.game = game
-    //       next()
-    //     })
-    //     .catch((error) => next(error))
-    // },
-    // // Fetch new player data
-    // getPlayers,
-    // // Respond with new player data in JSON and over socket
-    // (req, res, next) => {
-    //   io.emit('action', {
-    //     type: 'GAME_PLAYERS_UPDATED',
-    //     payload: {
-    //       game: req.game,
-    //       players: req.players
-    //     }
-    //   })
-    //   res.json(req.players)
-    // })
+      .put('/batches/:id/students/:id', authenticate, getStudents, (req, res, next) => {
+        const id = req.params.id
+        const studentPut = req.body
 
-    // .delete('/games/:id/players', authenticate, (req, res, next) => {
-    //   if (!req.game) { return next() }
-    //
-    //   const userId = req.account._id
-    //   const { playerOneId, playerTwoId } = req.game
-    //
-    //   const isPlayerOne = playerOneId.toString() === userId.toString()
-    //   const isPlayerTwo = playerTwoId.toString() === userId.toString()
-    //
-    //   if (!isPlayerOne || !isPlayerTwo) {
-    //     const error = Error.new('You are not a player in this game!')
-    //     error.status = 401
-    //     return next(error)
-    //   }
-    //
-    //   // Add the user to the players
-    //   if (isPlayerOne) req.game.playerOneId = null
-    //   if (isPlayerTwo) req.game.playerTwoId = null
-    //
-    //   req.game.save()
-    //     .then((game) => {
-    //       req.game = game
-    //       next()
-    //     })
-    //     .catch((error) => next(error))
-    //
-    // },
-    // // Fetch new player data
-    // getPlayers,
-    // // Respond with new player data in JSON and over socket
-    // (req, res, next) => {
-    //   io.emit('action', {
-    //     type: 'GAME_PLAYERS_UPDATED',
-    //     payload: {
-    //       game: req.game,
-    //       players: req.players
-    //     }
-    //   })
-    //   res.json(req.players)
-    // })
+        Student.findById(id)
+          .then((student) => {
+          if (!student) { return next() }
+
+          Student.findByIdAndUpdate(id, { $set: studentPut }, { new: true })
+            .then((student) => {
+              io.emit('action', {
+                type: 'STUDENT_UPDATED',
+                payload: student
+              })
+              res.status = 200
+              res.json(student)
+            })
+            .catch((error) => next(error))
+        })
+      })
+
+      .patch('/batches/:id/students/:id', authenticate, getStudents, (req, res, next) => {
+        const id = req.params.id
+        const studentPatch = req.body
+
+        Student.findById(id)
+          .then((student) => {
+          if (!student) { return next() }
+
+          const updatedStudent = { ...student, ...studentPatch }
+
+          Student.findByIdAndUpdate(id, { $set: updatedStudent }, { new: true })
+            .then((student) => {
+              io.emit('action', {
+                type: 'STUDENT_UPDATED',
+                payload: student
+              })
+              res.status = 200
+              res.json(student)
+            })
+            .catch((error) => next(error))
+        })
+      })
+
+      .delete('/batches/:id/students/:id', authenticate, (req, res, next) => {
+        const id = req.params.id
+
+        Student.findByIdAndRemove(id)
+          .then((student) => {
+            if (!student) { return next() }
+            io.emit('action', {
+              type: 'STUDENT_REMOVED',
+              payload: id
+            })
+            res.status = 200
+            res.json({
+              message: 'Deleted',
+              _id: id
+            })
+          })
+          .catch((error) => next(error))
+      })
 
   return router
 }
