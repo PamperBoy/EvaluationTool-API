@@ -2,7 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
 const passport = require('./config/auth')
-const { games, users, sessions, gamePlayers } = require('./routes')
+const { batches, users, sessions, students, evaluations } = require('./routes')
 const http = require('http')
 const socketAuth = require('./config/socket-auth')
 const socketIO = require('socket.io')
@@ -26,8 +26,9 @@ app
   .use(bodyParser.urlencoded({ extended: true }))
   .use(bodyParser.json())
   .use(passport.initialize())
-  .use(games(io))
-  .use(gamePlayers(io))
+  .use(batches(io))
+  .use(students(io))
+  .use(evaluations(io))
   .use(users)
   .use(sessions)
 
@@ -46,4 +47,6 @@ app
     })
   })
 
-server.listen(port)
+  server.listen(port, () => {
+    console.log(`Server is listening on port ${port}`)
+  })
