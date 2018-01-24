@@ -1,7 +1,7 @@
 // routes/games.js
 const router = require('express').Router()
 const passport = require('../../../config/auth')
-const { Batch, User, Student, Evaluation } = require('../../../models')
+const { User, Student, Evaluation } = require('../../../models')
 
 const authenticate = passport.authorize('jwt', { session: false })
 
@@ -58,68 +58,68 @@ module.exports = io => {
         .catch((error) => next(error))
       })
 
-      // .put('/batches/:id/students/:id', authenticate, getStudents, (req, res, next) => {
-      //   const id = req.params.id
-      //   const studentPut = req.body
-      //
-      //   Student.findById(id)
-      //     .then((student) => {
-      //     if (!student) { return next() }
-      //
-      //     Student.findByIdAndUpdate(id, { $set: studentPut }, { new: true })
-      //       .then((student) => {
-      //         io.emit('action', {
-      //           type: 'STUDENT_UPDATED',
-      //           payload: student
-      //         })
-      //         res.status = 200
-      //         res.json(student)
-      //       })
-      //       .catch((error) => next(error))
-      //   })
-      // })
-      //
-      // .patch('/batches/:id/students/:id', authenticate, getStudents, (req, res, next) => {
-      //   const id = req.params.id
-      //   const studentPatch = req.body
-      //
-      //   Student.findById(id)
-      //     .then((student) => {
-      //     if (!student) { return next() }
-      //
-      //     const updatedStudent = { ...student, ...studentPatch }
-      //
-      //     Student.findByIdAndUpdate(id, { $set: updatedStudent }, { new: true })
-      //       .then((student) => {
-      //         io.emit('action', {
-      //           type: 'STUDENT_UPDATED',
-      //           payload: student
-      //         })
-      //         res.status = 200
-      //         res.json(student)
-      //       })
-      //       .catch((error) => next(error))
-      //   })
-      // })
-      //
-      // .delete('/batches/:id/students/:id', authenticate, (req, res, next) => {
-      //   const id = req.params.id
-      //
-      //   Student.findByIdAndRemove(id)
-      //     .then((student) => {
-      //       if (!student) { return next() }
-      //       io.emit('action', {
-      //         type: 'STUDENT_REMOVED',
-      //         payload: id
-      //       })
-      //       res.status = 200
-      //       res.json({
-      //         message: 'Deleted',
-      //         _id: id
-      //       })
-      //     })
-      //     .catch((error) => next(error))
-      // })
+      .put('/batches/:id/students/:id/evaluations/:id', authenticate, getEvaluations, (req, res, next) => {
+        const id = req.params.id
+        const evaluationPut = req.body
+
+        Evaluation.findById(id)
+          .then((evaluation) => {
+          if (!evaluation || !evaluation.reporter === req.account._id) { return next() }
+
+          Evaluation.findByIdAndUpdate(id, { $set: evaluationPut }, { new: true })
+            .then((evaluation) => {
+              io.emit('action', {
+                type: 'EVALUATION_UPDATED',
+                payload: evaluation
+              })
+              res.status = 200
+              res.json(evaluation)
+            })
+            .catch((error) => next(error))
+        })
+      })
+
+      .patch('/batches/:id/students/:id/evaluations/:id', authenticate, getEvaluations, (req, res, next) => {
+        const id = req.params.id
+        const evaluationPatch = req.body
+
+        Evaluation.findById(id)
+          .then((evaluation) => {
+          if (!evaluation || !evaluation.reporter === req.account._id) { return next() }
+
+          const updatedEvaluation = { ...evaluation, ...evaluationPatch }
+
+          Evaluation.findByIdAndUpdate(id, { $set: updatedEvaluation }, { new: true })
+            .then((evaluation) => {
+              io.emit('action', {
+                type: 'EVALUATION_UPDATED',
+                payload: evaluation
+              })
+              res.status = 200
+              res.json(evaluation)
+            })
+            .catch((error) => next(error))
+        })
+      })
+
+      .delete('/batches/:id/students/:id/evaluations/:evaluationId', authenticate, (req, res, next) => {
+        const id = req.params.evaluationId
+
+        Evaluation.findByIdAndRemove(id)
+          .then((evaluation) => {
+            if (!evaluation || !evaluation.reporter === req.account._id) { return next() }
+            io.emit('action', {
+              type: 'EVALUATION_REMOVED',
+              payload: id
+            })
+            res.status = 200
+            res.json({
+              message: 'Deleted',
+              _id: id
+            })
+          })
+          .catch((error) => next(error))
+      })
 
 
   return router
