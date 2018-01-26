@@ -13,7 +13,7 @@ module.exports = io => {
         // Newest games first
         .sort({ createdAt: -1 })
         // Send the data in JSON format
-        .then((games) => res.json(games))
+        .then((batches) => res.json(batches))
         // Throw a 500 error if something goes wrong
         .catch((error) => next(error))
     })
@@ -28,18 +28,11 @@ module.exports = io => {
         .catch((error) => next(error))
     })
     .post('/batches', authenticate, (req, res, next) => {
-      const newBatch = {
-        batchNumber: req.body.batchNumber,
-        startDate: req.body.startDate,
-        endDate: req.body.endDate
-      }
+      const newBatch = req.body
 
       Batch.create(newBatch)
         .then((batch) => {
-          io.emit('action', {
-            type: 'BATCH_CREATED',
-            payload: batch
-          })
+          res.status = 201
           res.json(batch)
         })
         .catch((error) => next(error))
