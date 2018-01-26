@@ -47,16 +47,13 @@ module.exports = io => {
 
       Evaluation.create(newEvaluation)
         .then((evaluation) => {
-          io.emit('action', {
-            type: 'EVALUATION_CREATED',
-            payload: evaluation
-          })
           res.status = 201
 
           res.json(evaluation)
         })
         .catch((error) => next(error))
       })
+
 
       .put('/batches/:id/students/:id/evaluations/:id', authenticate, getEvaluations, (req, res, next) => {
         const id = req.params.id
